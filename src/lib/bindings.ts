@@ -24,17 +24,17 @@ async takeScreenshot(monitorId: string, resizeX: number, resizeY: number) : Prom
     else return { status: "error", error: e  as any };
 }
 },
-async moveMouse(monitorId: string, x: number, y: number) : Promise<Result<null, string>> {
+async moveMouse(monitorId: string, x: number, y: number, autoScreenshot: boolean | null, screenshotWidth: number | null, screenshotHeight: number | null) : Promise<Result<ActionResult, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("move_mouse", { monitorId, x, y }) };
+    return { status: "ok", data: await TAURI_INVOKE("move_mouse", { monitorId, x, y, autoScreenshot, screenshotWidth, screenshotHeight }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async mouseClick(monitorId: string, side: string, x: number | null, y: number | null) : Promise<Result<null, string>> {
+async mouseClick(monitorId: string, side: string, x: number | null, y: number | null, autoScreenshot: boolean | null, screenshotWidth: number | null, screenshotHeight: number | null) : Promise<Result<ActionResult, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("mouse_click", { monitorId, side, x, y }) };
+    return { status: "ok", data: await TAURI_INVOKE("mouse_click", { monitorId, side, x, y, autoScreenshot, screenshotWidth, screenshotHeight }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -48,25 +48,33 @@ async getCursorPosition(monitorId: string) : Promise<Result<[number, number], st
     else return { status: "error", error: e  as any };
 }
 },
-async typeText(text: string) : Promise<Result<null, string>> {
+async typeText(text: string, monitorId: string, autoScreenshot: boolean | null, screenshotWidth: number | null, screenshotHeight: number | null) : Promise<Result<ActionResult, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("type_text", { text }) };
+    return { status: "ok", data: await TAURI_INVOKE("type_text", { text, monitorId, autoScreenshot, screenshotWidth, screenshotHeight }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async scroll(monitorId: string, direction: string, amount: number) : Promise<Result<null, string>> {
+async scroll(monitorId: string, direction: string, amount: number, autoScreenshot: boolean | null, screenshotWidth: number | null, screenshotHeight: number | null) : Promise<Result<ActionResult, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("scroll", { monitorId, direction, amount }) };
+    return { status: "ok", data: await TAURI_INVOKE("scroll", { monitorId, direction, amount, autoScreenshot, screenshotWidth, screenshotHeight }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async pressKey(key: string) : Promise<Result<null, string>> {
+async pressKey(key: string, monitorId: string, autoScreenshot: boolean | null, screenshotWidth: number | null, screenshotHeight: number | null) : Promise<Result<ActionResult, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("press_key", { key }) };
+    return { status: "ok", data: await TAURI_INVOKE("press_key", { key, monitorId, autoScreenshot, screenshotWidth, screenshotHeight }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async wait(duration: number, monitorId: string, autoScreenshot: boolean | null, screenshotWidth: number | null, screenshotHeight: number | null) : Promise<Result<ActionResult, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("wait", { duration, monitorId, autoScreenshot, screenshotWidth, screenshotHeight }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -84,6 +92,7 @@ async pressKey(key: string) : Promise<Result<null, string>> {
 
 /** user-defined types **/
 
+export type ActionResult = { success: boolean; message: string; screenshot: string | null }
 export type Greeting = { message: string }
 export type MonitorData = { id: string; is_primary: boolean; name: string; width: number; height: number }
 

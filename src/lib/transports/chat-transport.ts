@@ -3,13 +3,10 @@ import { streamText, tool, convertToModelMessages, stepCountIs } from 'ai';
 import { z } from 'zod';
 import type { ChatTransport, UIMessage, UIMessageChunk, ChatRequestOptions } from 'ai';
 import { dev } from '$app/environment';
-
-// Development API key - replace with your own or use environment variables in production
-const DEV_OPENAI_API_KEY = 'sk-or-...';
-
+import { PUBLIC_DEV_OPENAI_API_KEY } from '$env/static/public'
 
 const openai = createOpenAI({
-  apiKey: DEV_OPENAI_API_KEY,
+  apiKey: PUBLIC_DEV_OPENAI_API_KEY,
   // Use proxy only in development mode, direct API in production
   baseURL: dev ? '/proxy/openai/v1' : undefined,
 });

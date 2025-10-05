@@ -9,15 +9,15 @@ import { dev } from '$app/environment';
 import tools from '../tools';
 import type { UITools } from '../tools';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
-import type { LanguageModelV2ToolResultOutput } from '@ai-sdk/provider';
+import type { LanguageModelV2, LanguageModelV2ToolResultOutput } from '@ai-sdk/provider';
 import type { ComputerUsageMetadata } from '../types/usage';
+import { PUBLIC_DEV_OPENROUTER_API_KEY } from '$env/static/public'
 
 // Development API key - replace with your own or use environment variables in production
-const DEV_OPENROUTER_API_KEY = 'sk-or-...';
 
 // const openrouter = createOpenAICompatible({
 //   name: 'openrouter',
-//   apiKey: DEV_OPENROUTER_API_KEY,
+//   apiKey: PUBLIC_DEV_OPENROUTER_API_KEY,
 //   // Use proxy in development mode to avoid CORS issues
 //   baseURL: 'https://openrouter.ai/api/v1',
 //   includeUsage: true,
@@ -25,7 +25,7 @@ const DEV_OPENROUTER_API_KEY = 'sk-or-...';
 // });
 
 const openrouter = createOpenRouter({
-  apiKey: DEV_OPENROUTER_API_KEY,
+  apiKey: PUBLIC_DEV_OPENROUTER_API_KEY,
   baseURL: 'https://openrouter.ai/api/v1',
   compatibility: 'compatible',
   extraBody: {
@@ -37,9 +37,17 @@ const openrouter = createOpenRouter({
   
 });
 
+const lmstudio = createOpenAICompatible({
+  name: 'lmstudio',
+  baseURL: 'http://localhost:1234/v1',
+  fetch: tauriFetch
+});
+
+type Provider = 'openrouter' | 'lmstudio';
+
 // Model configuration - determines which provider and middleware to use
 type ModelConfig = {
-  provider: 'openrouter';
+  provider: Provider;
   modelId: string;
   useMiddleware?: boolean;
   middlewareType?: 'gemma' | 'hermes' | 'morphXml' | 'uiTars' | 'none';
@@ -48,10 +56,38 @@ type ModelConfig = {
 };
 
 const MODEL_CONFIGS: Record<string, ModelConfig> = {
+  'mlx-community/lfm2-vl-1.6b': {
+    provider: 'lmstudio',
+    modelId: 'mlx-community/lfm2-vl-1.6b',
+    supportsNativeTools: true,
+    useMiddleware: false,
+    category: 'LiquidAI'
+  },
+  'openai/gpt-oss-20b': {
+    provider: 'lmstudio',
+    modelId: 'openai/gpt-oss-20b',
+    supportsNativeTools: true,
+    useMiddleware: false,
+    category: 'OpenAI'
+  },
+  'smolvlm2-2.2b-instruct-agentic-gui': {
+    provider: 'lmstudio',
+    modelId: 'smolvlm2-2.2b-instruct-agentic-gui',
+    supportsNativeTools: true,
+    useMiddleware: false,
+    category: 'Huggingface'
+  },
   // Anthropic Models (via OpenRouter)
   'anthropic/claude-opus-4.1': {
     provider: 'openrouter',
     modelId: 'anthropic/claude-opus-4.1',
+    supportsNativeTools: true,
+    useMiddleware: false,
+    category: 'Anthropic'
+  },
+  'anthropic/claude-sonnet-4.5': {
+    provider: 'openrouter',
+    modelId: 'anthropic/claude-sonnet-4.5',
     supportsNativeTools: true,
     useMiddleware: false,
     category: 'Anthropic'
@@ -199,21 +235,9 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     provider: 'openrouter',
     modelId: 'z-ai/glm-4.5v',
     supportsNativeTools: false,
-    useMiddleware: true,
-    middlewareType: 'morphXml',
+    useMiddleware: false,
     category: 'GLM'
   },
-  
-  // Other Models
-  'openrouter/sonoma-sky-alpha': {
-    provider: 'openrouter',
-    modelId: 'openrouter/sonoma-sky-alpha',
-    supportsNativeTools: false,
-    useMiddleware: true,
-    middlewareType: 'hermes', // Qwen/Llama like
-    category: 'OpenRouter'
-  },
-
   'x-ai/grok-code-fast-1': {
     provider: 'openrouter',
     modelId: 'x-ai/grok-code-fast-1',
@@ -249,7 +273,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
 
 export class ComputerTransport implements ChatTransport<UIMessage> {
   // Allow switching models - default to Claude via OpenRouter
-  private currentModelKey: string = 'anthropic/claude-opus-4.1';
+  private currentModelKey: string = 'anthropic/claude-sonnet-4.5';
   private middlewareOverride: 'gemma' | 'hermes' | 'morphXml' | 'uiTars' | 'none' | null = null;
   
   // Cumulative usage tracking across the conversation
@@ -455,7 +479,12 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
       let modelHeaders: Record<string, string> = {};
 
       // All models now use OpenRouter
-      const baseModel = openrouter(config.modelId);
+      let baseModel: LanguageModelV2;
+      if (config.provider === 'openrouter') {
+        baseModel = openrouter(config.modelId);
+      } else {
+        baseModel = lmstudio(config.modelId);
+      }
 
       console.log('🖥️ Base model:', baseModel);
       
@@ -524,13 +553,23 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
         messages: convertToModelMessages(messages, { tools }),
         abortSignal,
         stopWhen: stepCountIs(20), // Allow up to 20 tool steps
-        system: `You are an AI assistant with computer use capabilities. You can see the screen, move the cursor, click buttons, and type text using the computer tool.
+        system: `You are an AI assistant with computer use capabilities. 
+<SYSTEM_CAPABILITY>
+* You can see the screen, move the cursor, click buttons, and type text using the computer tool.
+</SYSTEM_CAPABILITY>
 
-IMPORTANT: You MUST complete ALL requested actions in sequence. For example:
+
+* When using Firefox, if a startup wizard appears, IGNORE IT.  Do not even click "skip this step".  Instead, click on the address bar where it says "Search or enter address", and enter the appropriate search term or URL there.
+* If the item you are looking at is a pdf, if after taking a single screenshot of the pdf it seems that you want to read the entire document instead of trying to continue to read the pdf from your screenshots + navigation, determine the URL, use curl to download the pdf, install and use pdftotext to convert it to a text file, and then read that text file directly with your str_replace_based_edit_tool.
+
+
+<IMPORTANT>
+You MUST complete ALL requested actions in sequence. For example:
 - When someone says "take a screenshot and click", FIRST take a screenshot, THEN click
 - When someone asks for multiple actions, perform them one by one
 - Always explain what you're doing at each step
 - Use the tools in the logical order requested
+</IMPORTANT>
 
 SCREENSHOT ANALYSIS: When you take a screenshot, you can see and analyze the image content. Use this to:
 - Identify UI elements, buttons, text fields, etc.
@@ -559,7 +598,7 @@ CRITICAL: Complete ALL requested actions, don't stop after just one tool call.`,
             // Check for specific model availability issues
             if (apiError.statusCode === 400) {
               console.warn(`🖥️ Model ${config.modelId} may not be available or may not support the requested features on OpenRouter`);
-              console.warn('🖥️ Try switching to a different model like anthropic/claude-opus-4.1 or google/gemini-2.0-flash-001');
+              console.warn('🖥️ Try switching to a different model like anthropic/claude-sonnet-4.5 or google/gemini-2.0-flash-001');
             }
           }
           

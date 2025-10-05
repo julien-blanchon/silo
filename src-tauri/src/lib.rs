@@ -30,6 +30,7 @@ fn create_builder() -> Builder<tauri::Wry> {
         commands::type_text,
         commands::scroll,
         commands::press_key,
+        commands::wait,
     ])
 }
 

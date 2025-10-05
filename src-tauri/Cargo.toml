@@ -35,4 +35,5 @@ image = "0.25"
 xcap = "0.0.12"
 tokio = { version = "1", features = ["full"] }
 base64 = "0.22"
+fast_image_resize = "4"
 

@@ -33,9 +33,9 @@ export default defineConfig(async () => ({
       '/proxy/anthropic': {
         target: 'https://api.anthropic.com',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/proxy\/anthropic/, ''),
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+        rewrite: (path: string) => path.replace(/^\/proxy\/anthropic/, ''),
+        configure: (proxy: any, options: any) => {
+          proxy.on('proxyReq', (proxyReq: any, req: any, res: any) => {
             console.log('🔄 Proxying Anthropic request:', req.url);
           });
         }
@@ -43,9 +43,9 @@ export default defineConfig(async () => ({
       '/proxy/openai': {
         target: 'https://api.openai.com',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/proxy\/openai/, ''),
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+        rewrite: (path: string) => path.replace(/^\/proxy\/openai/, ''),
+        configure: (proxy: any, options: any) => {
+          proxy.on('proxyReq', (proxyReq: any, req: any, res: any) => {
             console.log('🔄 Proxying OpenAI request:', req.url);
           });
         }
@@ -53,12 +53,12 @@ export default defineConfig(async () => ({
       '/proxy/openrouter': {
         target: 'https://openrouter.ai',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/proxy\/openrouter/, ''),
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+        rewrite: (path: string) => path.replace(/^\/proxy\/openrouter/, ''),
+        configure: (proxy: any, options: any) => {
+          proxy.on('proxyReq', (proxyReq: any, req: any, res: any) => {
             console.log('🔄 Proxying OpenRouter request:', req.url);
           });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes: any, req: any, res: any ) => {
             console.log('🔄 OpenRouter response status:', proxyRes.statusCode);
           });
         }

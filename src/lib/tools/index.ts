@@ -3,25 +3,56 @@ import { z } from 'zod';
 import { commands } from '../bindings';
 import type { InferUITools, ToolSet } from 'ai';
 import type { LanguageModelV2ToolResultOutput } from '@ai-sdk/provider';
-import { scaleCoordinates, getTargetDimensions, ScalingSource } from '../utils/scaling';
+import { scaleCoordinates, getOptimalComputerUseDimensions, ScalingSource } from '../utils/scaling';
 
 // Get the primary monitor ID and dimensions on startup
 let primaryMonitorId: string | null = null;
 let primaryMonitorDimensions: { width: number; height: number } = { width: 1920, height: 1080 };
+let computerUseDimensions: { width: number; height: number } | null = null;
+
+// Auto-screenshot setting (enabled by default)
+let autoScreenshotEnabled = true;
+
+export function setAutoScreenshot(enabled: boolean) {
+    autoScreenshotEnabled = enabled;
+    console.log('🖥️ Auto-screenshot:', enabled ? 'enabled' : 'disabled');
+}
+
+export function getAutoScreenshot(): boolean {
+    return autoScreenshotEnabled;
+}
 
 async function getPrimaryMonitorId(): Promise<string> {
     if (primaryMonitorId) return primaryMonitorId;
 
-    const result = await commands.getMonitors();
-    if (result.status === 'ok') {
-        const primaryMonitor = result.data.find(m => m.is_primary) || result.data[0];
-        if (primaryMonitor) {
-            primaryMonitorId = primaryMonitor.id;
-            primaryMonitorDimensions = { width: primaryMonitor.width, height: primaryMonitor.height };
-            return primaryMonitorId;
+    try {
+        const result = await commands.getMonitors();
+        if (result.status === 'ok') {
+            const primaryMonitor = result.data.find(m => m.is_primary) || result.data[0];
+            if (primaryMonitor) {
+                primaryMonitorId = primaryMonitor.id;
+                primaryMonitorDimensions = { width: primaryMonitor.width, height: primaryMonitor.height };
+                
+                // Calculate optimal computer use dimensions based on Claude's training data
+                const optimal = getOptimalComputerUseDimensions(primaryMonitorDimensions);
+                computerUseDimensions = optimal || primaryMonitorDimensions;
+                
+                console.log('🖥️  Monitor detected:', primaryMonitorDimensions);
+                console.log('🎯 Optimal Computer Use dimensions:', computerUseDimensions);
+                
+                return primaryMonitorId;
+            }
         }
+        throw new Error('No monitors found');
+    } catch (error) {
+        console.warn('⚠️ Failed to detect monitor (may be too early in app lifecycle):', error);
+        // Fallback to defaults - will retry on next call
+        if (!computerUseDimensions) {
+            computerUseDimensions = { width: 1280, height: 800 };
+            primaryMonitorDimensions = { width: 1920, height: 1080 };
+        }
+        throw error;
     }
-    throw new Error('No monitors found');
 }
 
 async function getPrimaryMonitorDimensions(): Promise<{ width: number; height: number }> {
@@ -29,14 +60,21 @@ async function getPrimaryMonitorDimensions(): Promise<{ width: number; height: n
     return primaryMonitorDimensions;
 }
 
-// Display configuration - matching Anthropic's computer tool parameters
-const DISPLAY_WIDTH_PX = 1024;
-const DISPLAY_HEIGHT_PX = 768;
-const DISPLAY_NUMBER = 1;
+async function getComputerUseDimensions(): Promise<{ width: number; height: number }> {
+    await getPrimaryMonitorId(); // This will set the dimensions
+    if (!computerUseDimensions) {
+        throw new Error('Computer use dimensions not initialized');
+    }
+    return computerUseDimensions;
+}
 
-const tools = {
-    computer: tool({
-        description: `Use a computer to perform actions like taking screenshots, clicking, typing, scrolling, and moving the mouse. The screen resolution is ${DISPLAY_WIDTH_PX}x${DISPLAY_HEIGHT_PX} pixels (display ${DISPLAY_NUMBER}).
+// Defer monitor detection until first tool use to avoid early initialization errors
+// The monitor will be detected on the first tool call (screenshot, click, etc.)
+// This prevents WebKit display ID errors on macOS during app startup
+
+function getToolDescription(): string {
+    const dims = computerUseDimensions || { width: 1280, height: 800 };
+    return `Use a computer to perform actions like taking screenshots, clicking, typing, scrolling, and moving the mouse. The screen resolution is ${dims.width}x${dims.height} pixels.
 
 Available actions:
 - key: Press a key or key-combination on the keyboard. This supports xdotool's key syntax. Examples: "a", "Return", "alt+Tab", "ctrl+s", "Up", "KP_0" (for the numpad 0 key).
@@ -54,7 +92,12 @@ Available actions:
 - triple_click: Triple-click the left mouse button at the specified (x, y) pixel coordinate on the screen.
 - scroll: Scroll the screen in a specified direction by a specified amount of clicks of the scroll wheel, at the specified (x, y) pixel coordinate. DO NOT use PageUp/PageDown to scroll.
 - wait: Wait for a specified duration (in seconds).
-- screenshot: Take a screenshot of the screen.`,
+- screenshot: Take a screenshot of the screen.`;
+}
+
+const tools = {
+    computer: tool({
+        description: getToolDescription(),
         inputSchema: z.object({
             action: z.enum([
                 'key',
@@ -90,25 +133,45 @@ Available actions:
                 .describe('Required only by action=type, action=key, and action=hold_key. Can also be used by click or scroll actions to hold down keys while clicking or scrolling.')
         }),
         execute: async ({ action, coordinate, text, duration, scroll_amount, scroll_direction, start_coordinate }) => {
-            console.log('🖥️ COMPUTER TOOL EXECUTED:', { 
-                action, 
-                coordinate, 
-                text, 
-                duration, 
-                scroll_amount, 
-                scroll_direction, 
-                start_coordinate,
-                displayConfig: { width: DISPLAY_WIDTH_PX, height: DISPLAY_HEIGHT_PX, display: DISPLAY_NUMBER }
-            });
-
             try {
-                const monitorId = await getPrimaryMonitorId();
-                const actualDimensions = await getPrimaryMonitorDimensions();
-                // Use the configured display dimensions for scaling
-                const targetDimensions = { width: DISPLAY_WIDTH_PX, height: DISPLAY_HEIGHT_PX };
+                // Lazy initialization: Detect monitor on first tool use with retry
+                let monitorId: string | undefined;
+                let retries = 3;
+                while (retries > 0) {
+                    try {
+                        monitorId = await getPrimaryMonitorId();
+                        break;
+                    } catch (error) {
+                        retries--;
+                        if (retries === 0) {
+                            throw new Error('Failed to detect monitor after multiple attempts. Please ensure the app is fully loaded.');
+                        }
+                        // Wait a bit and retry (allows time for window initialization)
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+                
+                if (!monitorId) {
+                    throw new Error('Monitor ID not available');
+                }
+                
+                const realDimensions = await getPrimaryMonitorDimensions();
+                const compUseDimensions = await getComputerUseDimensions();
+
+                console.log('🖥️ COMPUTER TOOL EXECUTED:', { 
+                    action, 
+                    coordinate, 
+                    text, 
+                    duration, 
+                    scroll_amount, 
+                    scroll_direction, 
+                    start_coordinate,
+                    realDimensions,
+                    computerUseDimensions: compUseDimensions
+                });
 
                 if (action === 'screenshot') {
-                    const screenshotResult = await commands.takeScreenshot(monitorId, targetDimensions.width, targetDimensions.height);
+                    const screenshotResult = await commands.takeScreenshot(monitorId, compUseDimensions.width, compUseDimensions.height);
 
                     if (screenshotResult.status === 'error') {
                         throw new Error(screenshotResult.error);
@@ -120,80 +183,188 @@ Available actions:
                         value: [{
                             type: 'media',
                             data: screenshotResult.data,
-                            mediaType: 'image/png',
+                            mediaType: 'image/jpeg',
                         }],
                     } satisfies LanguageModelV2ToolResultOutput;
                 } else if (action === 'left_click' || action === 'right_click') {
                     const button = action === 'left_click' ? 'left' : 'right';
                     
-                    let scaledX: number | null = null;
-                    let scaledY: number | null = null;
-                    
-                    if (coordinate) {
-                        const [scaledXCoord, scaledYCoord] = scaleCoordinates({
-                            source: ScalingSource.API,
-                            screenDimensions: actualDimensions,
-                            x: coordinate[0],
-                            y: coordinate[1],
-                        });
-                        scaledX = scaledXCoord;
-                        scaledY = scaledYCoord;
+                    if (!coordinate) {
+                        throw new Error('Coordinate is required for left_click and right_click');
                     }
+
+                    const [scaledXCoord, scaledYCoord] = scaleCoordinates({
+                        source: ScalingSource.API,
+                        realDimensions: realDimensions,
+                        computerUseDimensions: compUseDimensions,
+                        x: coordinate[0],
+                        y: coordinate[1],
+                    });
+                    const scaledX = scaledXCoord;
+                    const scaledY = scaledYCoord;
                     
                     const clickResult = await commands.mouseClick(
                         monitorId,
                         button,
                         scaledX,
-                        scaledY
+                        scaledY,
+                        autoScreenshotEnabled,
+                        compUseDimensions.width,
+                        compUseDimensions.height
                     );
 
                     if (clickResult.status === 'error') {
                         throw new Error(clickResult.error);
                     }
+                    
+                    if (!clickResult.data) {
+                        throw new Error('No data returned from click');
+                    }
+
+                    // If screenshot is included, return content with both text and media
+                    if (clickResult.data.screenshot) {
+                        return {
+                            type: 'content',
+                            value: [{
+                                type: 'text',
+                                text: clickResult.data.message
+                            }, {
+                                type: 'media',
+                                data: clickResult.data.screenshot,
+                                mediaType: 'image/jpeg',
+                            }],
+                        } satisfies LanguageModelV2ToolResultOutput;
+                    }
+
                     return {
                         type: 'text',
-                        value: `Successfully performed ${button} click${coordinate ? ` at (${coordinate[0]}, ${coordinate[1]})` : ''}`
+                        value: clickResult.data.message
                     } satisfies LanguageModelV2ToolResultOutput;
 
-                } else if (action === 'type' && text) {
-                    const typeResult = await commands.typeText(text);
+                } else if (action === 'type') {
+                    if (!text) {
+                        throw new Error('Text is required for type');
+                    }
+
+                    const typeResult = await commands.typeText(
+                        text,
+                        monitorId,
+                        autoScreenshotEnabled,
+                        compUseDimensions.width,
+                        compUseDimensions.height
+                    );
 
                     if (typeResult.status === 'error') {
                         throw new Error(typeResult.error);
                     }
+                    
+                    if (!typeResult.data) {
+                        throw new Error('No data returned from type');
+                    }
+
+                    // If screenshot is included, return content with both text and media
+                    if (typeResult.data.screenshot) {
+                        return {
+                            type: 'content',
+                            value: [{
+                                type: 'text',
+                                text: typeResult.data.message
+                            }, {
+                                type: 'media',
+                                data: typeResult.data.screenshot,
+                                mediaType: 'image/jpeg',
+                            }],
+                        } satisfies LanguageModelV2ToolResultOutput;
+                    }
 
                     return {
                         type: 'text',
-                        value: `Successfully typed: "${text}"`
+                        value: typeResult.data.message
                     } satisfies LanguageModelV2ToolResultOutput;
                 } else if (action === 'key' && text) {
-                    const keyResult = await commands.pressKey(text);
+                    const keyResult = await commands.pressKey(
+                        text,
+                        monitorId,
+                        autoScreenshotEnabled,
+                        compUseDimensions.width,
+                        compUseDimensions.height
+                    );
 
                     if (keyResult.status === 'error') {
                         throw new Error(keyResult.error);
                     }
-
-                    return {
-                        type: 'text',
-                        value: `Successfully pressed key: ${text}`
-                    } satisfies LanguageModelV2ToolResultOutput;
-                } else if (action === 'mouse_move' && coordinate) {
-                    const [scaledX, scaledY] = scaleCoordinates({
-                        source: ScalingSource.API,
-                        screenDimensions: actualDimensions,
-                        x: coordinate[0],
-                        y: coordinate[1],
-                    });
                     
-                    const moveResult = await commands.moveMouse(monitorId, scaledX, scaledY);
+                    if (!keyResult.data) {
+                        throw new Error('No data returned from key press');
+                    }
 
-                    if (moveResult.status === 'error') {
-                        throw new Error(moveResult.error);
+                    // If screenshot is included, return content with both text and media
+                    if (keyResult.data.screenshot) {
+                        return {
+                            type: 'content',
+                            value: [{
+                                type: 'text',
+                                text: keyResult.data.message
+                            }, {
+                                type: 'media',
+                                data: keyResult.data.screenshot,
+                                mediaType: 'image/jpeg',
+                            }],
+                        } satisfies LanguageModelV2ToolResultOutput;
                     }
 
                     return {
                         type: 'text',
-                        value: `Successfully moved mouse to (${coordinate[0]}, ${coordinate[1]})`
+                        value: keyResult.data.message
+                    } satisfies LanguageModelV2ToolResultOutput;
+                } else if (action === 'mouse_move') {
+                    if (!coordinate) {
+                        throw new Error('Coordinate is required for mouse_move');
+                    }
+
+                    const [scaledX, scaledY] = scaleCoordinates({
+                        source: ScalingSource.API,
+                        realDimensions: realDimensions,
+                        computerUseDimensions: compUseDimensions,
+                        x: coordinate[0],
+                        y: coordinate[1],
+                    });
+                    
+                    const moveResult = await commands.moveMouse(
+                        monitorId,
+                        scaledX,
+                        scaledY,
+                        autoScreenshotEnabled,
+                        compUseDimensions.width,
+                        compUseDimensions.height
+                    );
+
+                    if (moveResult.status === 'error') {
+                        throw new Error(moveResult.error);
+                    }
+                    
+                    if (!moveResult.data) {
+                        throw new Error('No data returned from mouse move');
+                    }
+
+                    // If screenshot is included, return content with both text and media
+                    if (moveResult.data.screenshot) {
+                        return {
+                            type: 'content',
+                            value: [{
+                                type: 'text',
+                                text: moveResult.data.message
+                            }, {
+                                type: 'media',
+                                data: moveResult.data.screenshot,
+                                mediaType: 'image/jpeg',
+                            }],
+                        } satisfies LanguageModelV2ToolResultOutput;
+                    }
+
+                    return {
+                        type: 'text',
+                        value: moveResult.data.message
                     } satisfies LanguageModelV2ToolResultOutput;
                 } else if (action === 'cursor_position') {
                     const positionResult = await commands.getCursorPosition(monitorId);
@@ -202,10 +373,11 @@ Available actions:
                         throw new Error(positionResult.error);
                     }
 
-                    // Scale cursor position from actual screen to target resolution
+                    // Scale cursor position from real screen to computer use resolution
                     const [scaledX, scaledY] = scaleCoordinates({
                         source: ScalingSource.COMPUTER,
-                        screenDimensions: actualDimensions,
+                        realDimensions: realDimensions,
+                        computerUseDimensions: compUseDimensions,
                         x: positionResult.data[0],
                         y: positionResult.data[1],
                     });
@@ -213,6 +385,46 @@ Available actions:
                     return {
                         type: 'text',
                         value: `Cursor position: (${scaledX}, ${scaledY})`
+                    } satisfies LanguageModelV2ToolResultOutput;
+                } else if (action === 'wait') {
+                    if (!duration) {
+                        throw new Error('Duration is required for wait');
+                    }
+
+                    const waitResult = await commands.wait(
+                        duration,
+                        monitorId,
+                        autoScreenshotEnabled,
+                        compUseDimensions.width,
+                        compUseDimensions.height
+                    );
+
+                    if (waitResult.status === 'error') {
+                        throw new Error(waitResult.error);
+                    }
+                    
+                    if (!waitResult.data) {
+                        throw new Error('No data returned from wait');
+                    }
+
+                    // If screenshot is included, return content with both text and media
+                    if (waitResult.data.screenshot) {
+                        return {
+                            type: 'content',
+                            value: [{
+                                type: 'text',
+                                text: waitResult.data.message
+                            }, {
+                                type: 'media',
+                                data: waitResult.data.screenshot,
+                                mediaType: 'image/jpeg',
+                            }],
+                        } satisfies LanguageModelV2ToolResultOutput;
+                    }
+
+                    return {
+                        type: 'text',
+                        value: waitResult.data.message
                     } satisfies LanguageModelV2ToolResultOutput;
                 } else {
                     return {

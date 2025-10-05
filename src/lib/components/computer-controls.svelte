@@ -33,7 +33,7 @@
 			const result = await commands.takeScreenshot(selectedMonitorId, 1024, 768);
 			if (result.status === 'ok') {
 				// Convert base64 to data URL for display
-				screenshotDataUrl = `data:image/png;base64,${result.data}`;
+				screenshotDataUrl = `data:image/jpeg;base64,${result.data}`;
 			} else {
 				console.error('Failed to take screenshot:', result.error);
 			}
@@ -46,7 +46,7 @@
 		if (!selectedMonitorId) return;
 		
 		try {
-			const result = await commands.moveMouse(selectedMonitorId, mouseX, mouseY);
+			const result = await commands.moveMouse(selectedMonitorId, mouseX, mouseY, null, null, null);
 			if (result.status === 'error') {
 				console.error('Failed to move mouse:', result.error);
 			}
@@ -59,7 +59,7 @@
 		if (!selectedMonitorId) return;
 		
 		try {
-			const result = await commands.mouseClick(selectedMonitorId, side, mouseX, mouseY);
+			const result = await commands.mouseClick(selectedMonitorId, side, mouseX, mouseY, null, null, null);
 			if (result.status === 'error') {
 				console.error('Failed to click mouse:', result.error);
 			}
@@ -72,7 +72,7 @@
 		if (!textToType) return;
 		
 		try {
-			const result = await commands.typeText(textToType);
+			const result = await commands.typeText(textToType, selectedMonitorId, null, null, null);
 			if (result.status === 'error') {
 				console.error('Failed to type text:', result.error);
 			}
@@ -85,7 +85,7 @@
 		if (!keyToPress) return;
 		
 		try {
-			const result = await commands.pressKey(keyToPress);
+			const result = await commands.pressKey(keyToPress, selectedMonitorId, null, null, null);
 			if (result.status === 'error') {
 				console.error('Failed to press key:', result.error);
 			}
@@ -209,6 +209,20 @@
 				disabled={!keyToPress}
 			>
 				Press Key
+			</button>
+		</div>
+		<!-- Example: Spotlight -->
+		<div class="mt-2">
+			<button 
+				on:click={async () => {
+					const result = await commands.pressKey('cmd+space', selectedMonitorId, null, null, null);
+					if (result.status === 'error') {
+						console.error('Failed to press Cmd+Space:', result.error);
+					}
+				}}
+				class="px-3 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
+			>
+				Example: Cmd+Space (Spotlight)
 			</button>
 		</div>
 	</div>
