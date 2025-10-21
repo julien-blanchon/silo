@@ -426,6 +426,67 @@ const tools = {
                         type: 'text',
                         value: waitResult.data.message
                     } satisfies LanguageModelV2ToolResultOutput;
+                } else if (action === 'left_click_drag') {
+                    if (!start_coordinate || !coordinate) {
+                        throw new Error('Both start_coordinate and coordinate are required for left_click_drag');
+                    }
+
+                    // Scale the start coordinates
+                    const [scaledStartX, scaledStartY] = scaleCoordinates({
+                        source: ScalingSource.API,
+                        realDimensions: realDimensions,
+                        computerUseDimensions: compUseDimensions,
+                        x: start_coordinate[0],
+                        y: start_coordinate[1],
+                    });
+
+                    // Scale the end coordinates
+                    const [scaledEndX, scaledEndY] = scaleCoordinates({
+                        source: ScalingSource.API,
+                        realDimensions: realDimensions,
+                        computerUseDimensions: compUseDimensions,
+                        x: coordinate[0],
+                        y: coordinate[1],
+                    });
+                    
+                    const dragResult = await commands.mouseDrag(
+                        monitorId,
+                        scaledStartX,
+                        scaledStartY,
+                        scaledEndX,
+                        scaledEndY,
+                        autoScreenshotEnabled,
+                        compUseDimensions.width,
+                        compUseDimensions.height
+                    );
+
+                    if (dragResult.status === 'error') {
+                        throw new Error(dragResult.error);
+                    }
+                    
+                    if (!dragResult.data) {
+                        throw new Error('No data returned from drag');
+                    }
+
+                    // If screenshot is included, return content with both text and media
+                    if (dragResult.data.screenshot) {
+                        return {
+                            type: 'content',
+                            value: [{
+                                type: 'text',
+                                text: dragResult.data.message
+                            }, {
+                                type: 'media',
+                                data: dragResult.data.screenshot,
+                                mediaType: 'image/jpeg',
+                            }],
+                        } satisfies LanguageModelV2ToolResultOutput;
+                    }
+
+                    return {
+                        type: 'text',
+                        value: dragResult.data.message
+                    } satisfies LanguageModelV2ToolResultOutput;
                 } else {
                     return {
                         type: 'text',
