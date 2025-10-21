@@ -9,6 +9,25 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [tailwindcss(), sveltekit()],
 
+  //! Temp fix
+  // Polyfill Node.js modules for browser compatibility (needed for Tauri)
+  resolve: {
+    alias: {
+      stream: 'stream-browserify'
+    }
+  },
+
+  // Configure packages that use Node.js APIs to only be used server-side
+  ssr: {
+    noExternal: ['@ai-sdk-tool/rxml', '@ai-sdk-tool/parser']
+  },
+
+  // Exclude Node.js-only packages from client-side optimization
+  optimizeDeps: {
+    exclude: ['@ai-sdk-tool/rxml', '@ai-sdk-tool/parser']
+  },
+  //! Temp fix
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
@@ -20,10 +39,10 @@ export default defineConfig(async () => ({
     host: host || false,
     hmr: host
       ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
+        protocol: "ws",
+        host,
+        port: 1421,
+      }
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
@@ -58,7 +77,7 @@ export default defineConfig(async () => ({
           proxy.on('proxyReq', (proxyReq: any, req: any, res: any) => {
             console.log('🔄 Proxying OpenRouter request:', req.url);
           });
-          proxy.on('proxyRes', (proxyRes: any, req: any, res: any ) => {
+          proxy.on('proxyRes', (proxyRes: any, req: any, res: any) => {
             console.log('🔄 OpenRouter response status:', proxyRes.statusCode);
           });
         }
