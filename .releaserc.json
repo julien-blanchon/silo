@@ -15,48 +15,22 @@
                             "package.json"
                         ],
                         "from": "\"version\": \".*\"",
-                        "to": "\"version\": \"${nextRelease.version}\"",
-                        "results": [
-                            {
-                                "file": "package.json",
-                                "hasChanged": true,
-                                "numMatches": 1,
-                                "numReplacements": 1
-                            }
-                        ],
-                        "countMatches": true
+                        "to": "\"version\": \"${nextRelease.version}\""
                     },
                     {
                         "files": [
                             "src-tauri/tauri.conf.json"
                         ],
                         "from": "\"version\": \".*\"",
-                        "to": "\"version\": \"${nextRelease.version}\"",
-                        "results": [
-                            {
-                                "file": "src-tauri/tauri.conf.json",
-                                "hasChanged": true,
-                                "numMatches": 1,
-                                "numReplacements": 1
-                            }
-                        ],
-                        "countMatches": true
+                        "to": "\"version\": \"${nextRelease.version}\""
                     },
                     {
                         "files": [
                             "src-tauri/Cargo.toml"
                         ],
-                        "from": "version = \".*\"",
+                        "from": "^version = \"[^\"]*\"",
                         "to": "version = \"${nextRelease.version}\"",
-                        "results": [
-                            {
-                                "file": "src-tauri/Cargo.toml",
-                                "hasChanged": true,
-                                "numMatches": 1,
-                                "numReplacements": 1
-                            }
-                        ],
-                        "countMatches": true
+                        "isRegex": true
                     }
                 ]
             }
