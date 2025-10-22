@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/julien-blanchon/silo/compare/v1.3.0...v1.3.1) (2025-10-22)
+
+
+### Bug Fixes
+
+* Fix brew ([7a3fe0a](https://github.com/julien-blanchon/silo/commit/7a3fe0a0b7e636ee9e8619965f19d7af4f5cd94e))
+
 # [1.3.0](https://github.com/julien-blanchon/silo/compare/v1.2.2...v1.3.0) (2025-10-22)
 
 
