@@ -147,8 +147,8 @@ jobs:
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
               with:
-                  tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
-                  releaseName: "Silo App v__VERSION__"
+                  tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
+                  releaseName: "SiloCU v__VERSION__"
                   releaseBody: "See the assets to download this version and install."
                   releaseDraft: false
                   prerelease: false
@@ -171,7 +171,7 @@ jobs:
             - name: Download Release Asset
               run: |
                   mkdir dist
-                  gh release download "app-v${{ needs.build-tauri.outputs.app_version }}" \
+                  gh release download "v${{ needs.build-tauri.outputs.app_version }}" \
                     --repo julien-blanchon/silo \
                     --pattern "*aarch64.app.tar.gz" \
                     --dir dist
@@ -189,7 +189,7 @@ jobs:
             - name: Update Cask
               run: |
                   VERSION="${{ needs.build-tauri.outputs.app_version }}"
-                  DOWNLOAD_URL="https://github.com/julien-blanchon/silo/releases/download/app-v${VERSION}/${{ steps.shasum.outputs.file_name }}"
+                  DOWNLOAD_URL="https://github.com/julien-blanchon/silo/releases/download/v${VERSION}/${{ steps.shasum.outputs.file_name }}"
                   CASK_PATH="tap-repo/Casks/SiloCU.rb"
 
                   echo "Generating cask for version $VERSION..."
