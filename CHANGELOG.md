@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/julien-blanchon/silo/compare/v1.0.0...v1.1.0) (2025-10-22)
+
+
+### Features
+
+* test semantic release setup ([1a4f1a2](https://github.com/julien-blanchon/silo/commit/1a4f1a207e2afdaa9b72214b2576e8288b4bb69d))
+
 # 1.0.0 (2025-10-22)
 
 
