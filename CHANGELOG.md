@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/julien-blanchon/silo/compare/v1.2.2...v1.3.0) (2025-10-22)
+
+
+### Features
+
+* **ui:** add screenshot and auto-scroll capabilities ([a7bcdb4](https://github.com/julien-blanchon/silo/commit/a7bcdb46573b96ab2e898b6333c0f57ce0a90b89))
+
 ## [1.2.2](https://github.com/julien-blanchon/silo/compare/v1.2.1...v1.2.2) (2025-10-22)
 
 
