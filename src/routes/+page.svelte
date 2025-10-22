@@ -55,6 +55,7 @@
   } from "$lib/components/ai-elements/tool";
   import { formatTruncatedJson } from "$lib/utils/truncate";
   import { setAutoScreenshot, getAutoScreenshot } from "$lib/tools";
+  import { settingsStore } from "$lib/runes/settings.svelte";
 
   const computerTransport = new ComputerTransport();
 
@@ -66,7 +67,6 @@
       toast.error(error.message || "Something went wrong");
     },
   });
-  
 
   // Available models grouped by category
   const MODELS = [
@@ -292,7 +292,10 @@
     },
   ];
 
-  let selectedModel = $state("anthropic/claude-sonnet-4.5");
+  // Initialize from settings store
+  let selectedModel = $state(
+    settingsStore.state.defaultModel || "anthropic/claude-sonnet-4.5",
+  );
   let selectedMiddleware:
     | "gemma"
     | "hermes"
@@ -304,9 +307,19 @@
   // String representation for the select component
   const middlewareSelectValue = $derived(selectedMiddleware || "default");
 
+  // Initialize the transport with the selected model
+  $effect(() => {
+    if (selectedModel) {
+      computerTransport.setModel(selectedModel);
+    }
+  });
+
   function switchModel(modelKey: string) {
     selectedModel = modelKey;
     computerTransport.setModel(modelKey);
+
+    // Save to settings store
+    settingsStore.state.defaultModel = modelKey;
 
     // Reset middleware to default when switching models
     selectedMiddleware = null;
@@ -349,13 +362,25 @@
   // Prompt input state
   let promptText = $state("");
 
-  // Auto-screenshot setting
-  let autoScreenshot = $state(getAutoScreenshot());
+  // Auto-screenshot setting - sync with settings store
+  let autoScreenshot = $state(settingsStore.state.autoScreenshot);
+
+  // Sync auto-screenshot with settings store and tool state
+  $effect(() => {
+    const enabled = settingsStore.state.autoScreenshot;
+    if (typeof enabled === "boolean") {
+      setAutoScreenshot(enabled);
+      autoScreenshot = enabled;
+    }
+  });
 
   function toggleAutoScreenshot() {
-    autoScreenshot = !autoScreenshot;
-    setAutoScreenshot(autoScreenshot);
-    toast.success(autoScreenshot ? "Auto-screenshot enabled" : "Auto-screenshot disabled");
+    settingsStore.state.autoScreenshot = !settingsStore.state.autoScreenshot;
+    toast.success(
+      settingsStore.state.autoScreenshot
+        ? "Auto-screenshot enabled"
+        : "Auto-screenshot disabled",
+    );
   }
 
   function clearChat() {
@@ -455,6 +480,15 @@
             </ContextContent>
           </Context>
         {/if}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onclick={() => (window.location.href = "/settings")}
+        >
+          <Icons name="settings" size={16} />
+          <span class="ml-2">Settings</span>
+        </Button>
 
         <Button
           variant="outline"
@@ -907,7 +941,9 @@
           <PromptInputButton
             onclick={toggleAutoScreenshot}
             class={autoScreenshot ? "bg-primary/10 text-primary" : ""}
-            title={autoScreenshot ? "Auto-screenshot enabled" : "Auto-screenshot disabled"}
+            title={autoScreenshot
+              ? "Auto-screenshot enabled"
+              : "Auto-screenshot disabled"}
           >
             📸
           </PromptInputButton>
@@ -964,11 +1000,14 @@
             </Select.Content>
           </Select.Root>
         </PromptInputTools>
-        <PromptInputSubmit status={chat.status} onclick={() => {
+        <PromptInputSubmit
+          status={chat.status}
+          onclick={() => {
             if (chat.status && chat.status !== "ready") {
               chat.stop();
             }
-          }}/>
+          }}
+        />
       </PromptInputToolbar>
     </PromptInput>
   </div>

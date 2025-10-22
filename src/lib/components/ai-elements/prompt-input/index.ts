@@ -45,7 +45,6 @@ export {
   AttachmentsContext,
   getAttachmentsContext,
   setAttachmentsContext,
-  type FileUIPart,
   type FileWithId,
   type PromptInputMessage,
   type ChatStatus

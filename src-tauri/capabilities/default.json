@@ -8,7 +8,8 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
-    "store:default",
+    "svelte:default",
+    "core:event:default",
     "fs:scope-appdata-recursive",
     "fs:scope-document-recursive",
     "fs:scope-download-recursive",

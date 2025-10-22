@@ -3,7 +3,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { streamText, convertToModelMessages, stepCountIs, wrapLanguageModel } from 'ai';
 import { gemmaToolMiddleware, hermesToolMiddleware, morphXmlToolMiddleware } from '@ai-sdk-tool/parser';
-import { uiTarsToolMiddleware } from '../protocols';
+import { uiTarsToolMiddleware } from '../middleware';
 import type { ChatTransport, UIMessage, UIMessageChunk, ChatRequestOptions, ModelMessage, ToolModelMessage, ToolContent, UserModelMessage, LanguageModelUsage } from 'ai';
 import { dev } from '$app/environment';
 import tools from '../tools';
@@ -11,37 +11,37 @@ import type { UITools } from '../tools';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import type { LanguageModelV2, LanguageModelV2ToolResultOutput } from '@ai-sdk/provider';
 import type { ComputerUsageMetadata } from '../types/usage';
-import { PUBLIC_DEV_OPENROUTER_API_KEY } from '$env/static/public'
+import { settingsStore } from '../runes/settings.svelte';
 
-// Development API key - replace with your own or use environment variables in production
+// Create provider factory functions that use the settings store
+function getOpenRouter() {
+  const apiKey = settingsStore.state.openrouterApiKey;
+  if (!apiKey) {
+    throw new Error('OpenRouter API key not configured. Please add it in Settings.');
+  }
 
-// const openrouter = createOpenAICompatible({
-//   name: 'openrouter',
-//   apiKey: PUBLIC_DEV_OPENROUTER_API_KEY,
-//   // Use proxy in development mode to avoid CORS issues
-//   baseURL: 'https://openrouter.ai/api/v1',
-//   includeUsage: true,
-//   fetch: tauriFetch
-// });
+  return createOpenRouter({
+    apiKey,
+    baseURL: 'https://openrouter.ai/api/v1',
+    compatibility: 'compatible',
+    extraBody: {
+      usage: {
+        include: true
+      }
+    },
+    fetch: tauriFetch
+  });
+}
 
-const openrouter = createOpenRouter({
-  apiKey: PUBLIC_DEV_OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-  compatibility: 'compatible',
-  extraBody: {
-    usage: {
-      include: true
-    }
-  },
-  fetch: tauriFetch
-  
-});
+function getLMStudio() {
+  const baseURL = settingsStore.state.lmstudioUrl || 'http://localhost:1234/v1';
 
-const lmstudio = createOpenAICompatible({
-  name: 'lmstudio',
-  baseURL: 'http://localhost:1234/v1',
-  fetch: tauriFetch
-});
+  return createOpenAICompatible({
+    name: 'lmstudio',
+    baseURL,
+    fetch: tauriFetch
+  });
+}
 
 type Provider = 'openrouter' | 'lmstudio';
 
@@ -92,7 +92,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     useMiddleware: false,
     category: 'Anthropic'
   },
-  
+
   // OpenAI Models
   'openai/gpt-5': {
     provider: 'openrouter',
@@ -152,7 +152,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     useMiddleware: false,
     category: 'LLaMA'
   },
-  
+
   // Qwen Models (Hermes/XML middleware)
   'qwen/qwen3-max': {
     provider: 'openrouter',
@@ -170,7 +170,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     middlewareType: 'hermes',
     category: 'Qwen'
   },
-  
+
   // Google Models
   'google/gemma-3-27b-it': {
     provider: 'openrouter',
@@ -187,7 +187,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     useMiddleware: false,
     category: 'Google'
   },
-  
+
   // Hermes Models (Hermes middleware)
   'nousresearch/hermes-4-405b': {
     provider: 'openrouter',
@@ -197,7 +197,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     middlewareType: 'hermes',
     category: 'Nous Research'
   },
-  
+
   // DeepSeek Models (may support native tools)
   'deepseek/deepseek-chat-v3.1': {
     provider: 'openrouter',
@@ -206,7 +206,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     useMiddleware: false,
     category: 'DeepSeek'
   },
-  
+
   // Mistral Models (may support native tools)
   'mistralai/mistral-medium-3.1': {
     provider: 'openrouter',
@@ -229,7 +229,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     useMiddleware: false,
     category: 'Mistral'
   },
-  
+
   // GLM Models (XML middleware)
   'z-ai/glm-4.5v': {
     provider: 'openrouter',
@@ -275,7 +275,7 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
   // Allow switching models - default to Claude via OpenRouter
   private currentModelKey: string = 'anthropic/claude-sonnet-4.5';
   private middlewareOverride: 'gemma' | 'hermes' | 'morphXml' | 'uiTars' | 'none' | null = null;
-  
+
   // Cumulative usage tracking across the conversation
   private cumulativeUsage: LanguageModelUsage = {
     inputTokens: 0,
@@ -284,10 +284,10 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
     reasoningTokens: 0,
     cachedInputTokens: 0
   };
-  
+
   // Track which tool call IDs have been processed to avoid reprocessing
   private processedToolCallIds = new Set<string>();
-  
+
   // Method to switch models
   setModel(modelKey: string) {
     if (MODEL_CONFIGS[modelKey]) {
@@ -297,18 +297,18 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
       console.error(`🖥️ Unknown model: ${modelKey}`);
     }
   }
-  
+
   // Method to override middleware
   setMiddleware(middleware: 'gemma' | 'hermes' | 'morphXml' | 'uiTars' | 'none' | null) {
     this.middlewareOverride = middleware;
     console.log(`🖥️ Middleware override set to: ${middleware || 'default'}`);
   }
-  
+
   // Method to get current cumulative usage
   getCumulativeUsage(): LanguageModelUsage {
     return { ...this.cumulativeUsage };
   }
-  
+
   // Method to reset cumulative usage (e.g., when starting a new conversation)
   resetUsage() {
     this.cumulativeUsage = {
@@ -319,26 +319,26 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
       cachedInputTokens: 0
     };
   }
-  
+
   // Method to reset processed tool call IDs (e.g., when starting a new conversation)
   resetProcessedToolCalls() {
     this.processedToolCallIds.clear();
     console.log('🖥️ Cleared processed tool call IDs');
   }
-  
+
   // Helper to add usage numbers safely
   private addUsage(current: number | undefined, additional: number | undefined): number {
     return (current || 0) + (additional || 0);
   }
-  
+
   // Analyze conversation to find existing image messages and all tool images
   private analyzeConversationImages(messages: ModelMessage[]) {
     const existingImageMessages: number[] = [];
     const allToolImages: { data: string; description: string; toolCallId: string; messageIndex: number; timestamp: number }[] = [];
-    
+
     messages.forEach((message, index) => {
-      if (message.role === 'user' && Array.isArray(message.content) && 
-          message.content.some(part => part.type === 'text' && part.text.startsWith('[System:'))) {
+      if (message.role === 'user' && Array.isArray(message.content) &&
+        message.content.some(part => part.type === 'text' && part.text.startsWith('[System:'))) {
         existingImageMessages.push(index);
       } else if (message.role === 'tool') {
         message.content.forEach(part => {
@@ -353,7 +353,7 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
                   messageIndex: index,
                   timestamp: Date.now() // Add timestamp for proper ordering
                 });
-                
+
                 // Log only if this is a truly new tool call
                 if (!this.processedToolCallIds.has(part.toolCallId)) {
                   console.log(`🖥️ Found new image from tool ${part.toolCallId} (screenshot ${allToolImages.length})`);
@@ -367,31 +367,31 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
         });
       }
     });
-    
+
     // Sort by message index to maintain chronological order
     allToolImages.sort((a, b) => a.messageIndex - b.messageIndex);
-    
+
     return { existingImageMessages, allToolImages };
   }
-  
+
   // Build the cleaned conversation with image management
   private buildCleanedConversation(
-    messages: ModelMessage[], 
-    existingImageMessages: number[], 
+    messages: ModelMessage[],
+    existingImageMessages: number[],
     imagesToKeep: { data: string; description: string; toolCallId: string; messageIndex: number; timestamp?: number }[]
   ): ModelMessage[] {
     const finalMessages: ModelMessage[] = [];
-    
+
     messages.forEach((message, index) => {
       // Skip existing image messages - they will be replaced
       if (existingImageMessages.includes(index)) {
         return;
       }
-      
+
       if (message.role === 'tool') {
         // Clean tool messages - remove image data, keep text
         const cleanToolResults: ToolContent = [];
-        
+
         message.content.forEach(part => {
           if (part.output.type === 'content') {
             let textDescription = '';
@@ -401,7 +401,7 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
               }
               // Skip media content - it's extracted to imagesToKeep
             }
-            
+
             cleanToolResults.push({
               ...part,
               output: {
@@ -413,7 +413,7 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
             cleanToolResults.push(part);
           }
         });
-        
+
         finalMessages.push({
           ...message,
           content: cleanToolResults
@@ -423,7 +423,7 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
         finalMessages.push(message);
       }
     });
-    
+
     // Add the kept images as user messages at the end, in chronological order
     imagesToKeep.forEach((image, index) => {
       finalMessages.push({
@@ -438,14 +438,14 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
         }]
       } satisfies UserModelMessage);
     });
-    
+
     if (imagesToKeep.length > 0) {
       console.log(`🖥️ Added ${imagesToKeep.length} images to conversation: ${imagesToKeep.map(img => img.toolCallId).join(', ')}`);
     }
-    
+
     return finalMessages;
   }
-  
+
   async sendMessages({
     trigger,
     chatId,
@@ -478,21 +478,23 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
       let providerOptions: any = {};
       let modelHeaders: Record<string, string> = {};
 
-      // All models now use OpenRouter
+      // Get the provider instance dynamically from settings
       let baseModel: LanguageModelV2;
       if (config.provider === 'openrouter') {
+        const openrouter = getOpenRouter();
         baseModel = openrouter(config.modelId);
       } else {
+        const lmstudio = getLMStudio();
         baseModel = lmstudio(config.modelId);
       }
 
       console.log('🖥️ Base model:', baseModel);
-      
+
       // Determine middleware to use (override takes precedence)
-      const useMiddleware = this.middlewareOverride !== null 
+      const useMiddleware = this.middlewareOverride !== null
         ? this.middlewareOverride !== 'none'
         : config.useMiddleware;
-      
+
       const middlewareType = this.middlewareOverride !== null && this.middlewareOverride !== 'none'
         ? this.middlewareOverride
         : config.middlewareType;
@@ -530,7 +532,7 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
               middleware: gemmaToolMiddleware,
             });
         }
-        
+
         // Add middleware error handling
         providerOptions = {
           toolCallMiddleware: {
@@ -539,7 +541,7 @@ export class ComputerTransport implements ChatTransport<UIMessage> {
             }
           }
         };
-        
+
         console.log(`🖥️ Using ${middlewareType} middleware for ${config.modelId}`);
       } else {
         // Use native tool calling
@@ -583,7 +585,7 @@ CRITICAL: Complete ALL requested actions, don't stop after just one tool call.`,
         tools: tools,
         onError: (error) => {
           console.error('🖥️ Computer Transport error:', error);
-          
+
           // Enhanced debugging for model-specific issues
           if (error && typeof error === 'object') {
             const apiError = error as any;
@@ -594,14 +596,14 @@ CRITICAL: Complete ALL requested actions, don't stop after just one tool call.`,
               url: apiError.url,
               modelId: config.modelId
             });
-            
+
             // Check for specific model availability issues
             if (apiError.statusCode === 400) {
               console.warn(`🖥️ Model ${config.modelId} may not be available or may not support the requested features on OpenRouter`);
               console.warn('🖥️ Try switching to a different model like anthropic/claude-sonnet-4.5 or google/gemini-2.0-flash-001');
             }
           }
-          
+
           throw error;
         },
         onStepFinish: ({ usage, dynamicToolResults, toolResults, toolCalls, content }) => {
@@ -611,7 +613,7 @@ CRITICAL: Complete ALL requested actions, don't stop after just one tool call.`,
           this.cumulativeUsage.totalTokens = this.addUsage(this.cumulativeUsage.totalTokens, usage.totalTokens);
           this.cumulativeUsage.reasoningTokens = this.addUsage(this.cumulativeUsage.reasoningTokens, usage.reasoningTokens);
           this.cumulativeUsage.cachedInputTokens = this.addUsage(this.cumulativeUsage.cachedInputTokens, usage.cachedInputTokens);
-          
+
           const { totalTokens, inputTokens, outputTokens, reasoningTokens } = usage;
           console.log('onStepFinish Prompt tokens:', inputTokens);
           console.log('onStepFinish Completion tokens:', outputTokens);
@@ -630,28 +632,28 @@ CRITICAL: Complete ALL requested actions, don't stop after just one tool call.`,
         },
         prepareStep: (step) => {
           const maxImagesInConversation = 5;
-          
+
           console.log(`🖥️ Processing conversation: ${step.messages.length} messages`);
-          
+
           // Find and collect image management data
           const { existingImageMessages, allToolImages } = this.analyzeConversationImages(step.messages);
-          
+
           // Keep ALL images if under limit, or the most recent ones if over limit
-          const imagesToKeep = allToolImages.length <= maxImagesInConversation 
-            ? allToolImages 
+          const imagesToKeep = allToolImages.length <= maxImagesInConversation
+            ? allToolImages
             : allToolImages.slice(-maxImagesInConversation);
-          
+
           console.log(`🖥️ Image management: ${existingImageMessages.length} existing, ${allToolImages.length} total → keeping ${imagesToKeep.length}`);
-          
+
           if (imagesToKeep.length > 0) {
-            console.log(`🖥️ Images to keep:`, imagesToKeep.map((img, i) => `${i+1}. ${img.toolCallId} (msg ${img.messageIndex})`));
+            console.log(`🖥️ Images to keep:`, imagesToKeep.map((img, i) => `${i + 1}. ${img.toolCallId} (msg ${img.messageIndex})`));
           }
-          
+
           // Build the cleaned conversation
           const finalMessages = this.buildCleanedConversation(step.messages, existingImageMessages, imagesToKeep);
-          
+
           console.log(`🖥️ Conversation transformed: ${step.messages.length} → ${finalMessages.length} messages`);
-          
+
           return {
             model: step.model,
             messages: finalMessages,
