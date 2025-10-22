@@ -31,6 +31,11 @@
     ContextReasoningUsage,
     ContextTrigger,
   } from "$lib/components/ai-elements/context";
+  import {
+    Conversation,
+    ConversationContent,
+    ConversationScrollButton,
+  } from "$lib/components/ai-elements/conversation";
   import Icons from "$lib/components/elements/icons.svelte";
   import { ComputerTransport } from "$lib/transports/computer-transport";
   import type { ComputerUIMessage } from "$lib/types/usage";
@@ -513,10 +518,11 @@
   </header>
 
   <!-- Messages -->
-  <div class="flex-1 overflow-x-hidden overflow-y-auto">
-    <div
-      class="mx-auto flex min-h-full max-w-4xl min-w-0 flex-col gap-6 px-4 pt-4 pb-6"
-    >
+  <Conversation class="flex-1">
+    <ConversationContent class="overflow-x-hidden">
+      <div
+        class="mx-auto flex min-h-full max-w-4xl min-w-0 flex-col gap-6 px-4 pt-4 pb-6"
+      >
       {#if chat.messages.length === 0}
         <div class="flex flex-1 items-center justify-center py-8">
           <div class="mx-auto max-w-2xl space-y-6 px-4 text-center">
@@ -768,6 +774,36 @@
                                 {/each}
                               {/if}
                             </div>
+                          {:else if input.action === "left_click_drag"}
+                            <div class="space-y-3 rounded-md bg-muted/50 p-3">
+                              <div class="flex items-center gap-2">
+                                <span class="text-2xl">🖱️➡️</span>
+                                <div>
+                                  <div class="font-medium">Drag Action</div>
+                                  <div class="text-sm text-muted-foreground">
+                                    Dragged from
+                                    {input?.start_coordinate
+                                      ? `(${input.start_coordinate[0]}, ${input.start_coordinate[1]})`
+                                      : ""}
+                                    to
+                                    {input?.coordinate
+                                      ? `(${input.coordinate[0]}, ${input.coordinate[1]})`
+                                      : ""}
+                                  </div>
+                                </div>
+                              </div>
+                              {#if part.output && part.output.type === "content" && part.output.value}
+                                {#each part.output.value as value}
+                                  {#if value && typeof value === "object" && "type" in value && value.type === "media"}
+                                    <img
+                                      src={`data:${value.mediaType};base64,${value.data?.toString()}`}
+                                      alt="Screenshot after drag"
+                                      class="w-full max-w-md rounded-lg border shadow-sm"
+                                    />
+                                  {/if}
+                                {/each}
+                              {/if}
+                            </div>
                           {/if}
                         {:else}
                           <div class="space-y-2 rounded-md bg-muted/50 p-3">
@@ -899,8 +935,10 @@
           </div>
         {/if}
       {/if}
-    </div>
-  </div>
+      </div>
+    </ConversationContent>
+    <ConversationScrollButton />
+  </Conversation>
 
   <!-- Input -->
   <div

@@ -79,6 +79,14 @@ async wait(duration: number, monitorId: string, autoScreenshot: boolean | null, 
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async mouseDrag(monitorId: string, startX: number, startY: number, endX: number, endY: number, autoScreenshot: boolean | null, screenshotWidth: number | null, screenshotHeight: number | null) : Promise<Result<ActionResult, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mouse_drag", { monitorId, startX, startY, endX, endY, autoScreenshot, screenshotWidth, screenshotHeight }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
