@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/julien-blanchon/silo/compare/v1.2.0...v1.2.1) (2025-10-22)
+
+
+### Bug Fixes
+
+* **ci:** add cargo lock update to semantic-release workflow ([28e7a14](https://github.com/julien-blanchon/silo/commit/28e7a146e7a61db5d9409fdc7d4b777f2c3d36ce))
+
 # [1.2.0](https://github.com/julien-blanchon/silo/compare/v1.1.1...v1.2.0) (2025-10-22)
 
 
