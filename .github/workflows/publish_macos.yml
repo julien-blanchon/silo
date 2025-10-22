@@ -187,7 +187,7 @@ jobs:
               run: |
                   VERSION="${{ needs.build-tauri.outputs.app_version }}"
                   DOWNLOAD_URL="https://github.com/julien-blanchon/silo/releases/download/app-v${VERSION}/${{ steps.shasum.outputs.file_name }}"
-                  CASK_PATH="tap-repo/Casks/Silo.rb"
+                  CASK_PATH="tap-repo/Casks/SiloCU.rb"
 
                   echo "Generating cask for version $VERSION..."
                   echo "Download URL: $DOWNLOAD_URL"
