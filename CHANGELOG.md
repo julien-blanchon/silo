@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/julien-blanchon/silo/compare/v1.1.0...v1.1.1) (2025-10-22)
+
+
+### Bug Fixes
+
+* **ci:** remove duplicate release workflow and correct cask filename ([f3c6674](https://github.com/julien-blanchon/silo/commit/f3c6674601755861a4bd00d3b41312cd68aed12e))
+
 # [1.1.0](https://github.com/julien-blanchon/silo/compare/v1.0.0...v1.1.0) (2025-10-22)
 
 
