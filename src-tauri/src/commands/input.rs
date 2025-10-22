@@ -317,6 +317,73 @@ pub async fn wait(
     })
 }
 
+#[tauri::command]
+#[specta::specta]
+pub async fn mouse_drag(
+    monitor_id: String,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    auto_screenshot: Option<bool>,
+    screenshot_width: Option<u32>,
+    screenshot_height: Option<u32>,
+) -> Result<ActionResult, String> {
+    let auto_screenshot = auto_screenshot.unwrap_or(true);
+    println!("-- Mouse drag: from ({}, {}) to ({}, {}), auto_screenshot: {:?}", 
+             start_x, start_y, end_x, end_y, auto_screenshot);
+
+    // Perform enigo operations in a blocking context
+    {
+        let monitor = get_monitor_by_id(monitor_id.clone())?;
+        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
+
+        // Move to start position
+        enigo
+            .move_mouse(monitor.x() + start_x, monitor.y() + start_y, Coordinate::Abs)
+            .map_err(|e| e.to_string())?;
+        
+        // Small delay to ensure the move completes
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        // Press left button
+        enigo
+            .button(Button::Left, Direction::Press)
+            .map_err(|e| e.to_string())?;
+        
+        // Small delay between press and move
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        // Move to end position while holding button
+        enigo
+            .move_mouse(monitor.x() + end_x, monitor.y() + end_y, Coordinate::Abs)
+            .map_err(|e| e.to_string())?;
+        
+        // Small delay before releasing
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        // Release left button
+        enigo
+            .button(Button::Left, Direction::Release)
+            .map_err(|e| e.to_string())?;
+    } // enigo is dropped here
+
+    // Take screenshot if requested
+    let screenshot = if auto_screenshot {
+        // Use std::thread::sleep instead of tokio::time::sleep for better thread safety
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        take_action_screenshot(monitor_id, screenshot_width, screenshot_height).await
+    } else {
+        None
+    };
+
+    Ok(ActionResult {
+        success: true,
+        message: format!("Successfully dragged from ({}, {}) to ({}, {})", start_x, start_y, end_x, end_y),
+        screenshot,
+    })
+}
+
 fn get_monitor_by_id(monitor_id: String) -> Result<Monitor, String> {
     let monitors = Monitor::all().map_err(|e| e.to_string())?;
     let monitor = monitors.iter().find(|m| m.id().to_string() == monitor_id);
