@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/julien-blanchon/silo/compare/v1.2.1...v1.2.2) (2025-10-22)
+
+
+### Bug Fixes
+
+* **ci:** align tag formats and add cargo lock updates ([27a6195](https://github.com/julien-blanchon/silo/commit/27a6195c89ea599a8b842fbb5a5e9837d6561776))
+
 ## [1.2.1](https://github.com/julien-blanchon/silo/compare/v1.2.0...v1.2.1) (2025-10-22)
 
 
