@@ -17,7 +17,7 @@ To install Silo with Homebrew:
 brew tap julien-blanchon/homebrew-tap
 
 # Then install silo
-brew install --cask SiloCU
+brew install --cask silocu
 ```
 
 ## Development

@@ -148,7 +148,7 @@ jobs:
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
               with:
                   tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
-                  releaseName: "SiloCU v__VERSION__"
+                  releaseName: "silocu v__VERSION__"
                   releaseBody: "See the assets to download this version and install."
                   releaseDraft: false
                   prerelease: false
@@ -190,19 +190,19 @@ jobs:
               run: |
                   VERSION="${{ needs.build-tauri.outputs.app_version }}"
                   DOWNLOAD_URL="https://github.com/julien-blanchon/silo/releases/download/v${VERSION}/${{ steps.shasum.outputs.file_name }}"
-                  CASK_PATH="tap-repo/Casks/SiloCU.rb"
+                  CASK_PATH="tap-repo/Casks/silocu.rb"
 
                   echo "Generating cask for version $VERSION..."
                   echo "Download URL: $DOWNLOAD_URL"
 
-                  echo "cask \"SiloCU\" do" > "$CASK_PATH"
+                  echo "cask \"silocu\" do" > "$CASK_PATH"
                   echo "  version \"$VERSION\"" >> "$CASK_PATH"
                   echo "  sha256 \"${{ steps.shasum.outputs.sha256 }}\"" >> "$CASK_PATH"
                   echo "" >> "$CASK_PATH"
                   echo "  url \"$DOWNLOAD_URL\"," >> "$CASK_PATH"
                   echo "      verified: \"github.com/julien-blanchon/silo/\"" >> "$CASK_PATH"
                   echo "" >> "$CASK_PATH"
-                  echo "  name \"SiloCU\"" >> "$CASK_PATH"
+                  echo "  name \"silocu\"" >> "$CASK_PATH"
                   echo "  desc \"AI-powered desktop app built with Tauri\"" >> "$CASK_PATH"
                   echo "  homepage \"https://github.com/julien-blanchon/silo\"" >> "$CASK_PATH"
                   echo "" >> "$CASK_PATH"
@@ -212,6 +212,6 @@ jobs:
                   cd tap-repo
                   git config user.name "github-actions"
                   git config user.email "github-actions@github.com"
-                  git add Casks/SiloCU.rb
-                  git commit -m "Update SiloCU cask to v$VERSION"
+                  git add Casks/silocu.rb
+                  git commit -m "Update silocu cask to v$VERSION"
                   git push origin main
