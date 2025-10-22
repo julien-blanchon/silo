@@ -192,14 +192,14 @@ jobs:
                   echo "Generating cask for version $VERSION..."
                   echo "Download URL: $DOWNLOAD_URL"
 
-                  echo "cask \"Silo\" do" > "$CASK_PATH"
+                  echo "cask \"SiloCU\" do" > "$CASK_PATH"
                   echo "  version \"$VERSION\"" >> "$CASK_PATH"
                   echo "  sha256 \"${{ steps.shasum.outputs.sha256 }}\"" >> "$CASK_PATH"
                   echo "" >> "$CASK_PATH"
                   echo "  url \"$DOWNLOAD_URL\"," >> "$CASK_PATH"
                   echo "      verified: \"github.com/julien-blanchon/silo/\"" >> "$CASK_PATH"
                   echo "" >> "$CASK_PATH"
-                  echo "  name \"Silo\"" >> "$CASK_PATH"
+                  echo "  name \"SiloCU\"" >> "$CASK_PATH"
                   echo "  desc \"AI-powered desktop app built with Tauri\"" >> "$CASK_PATH"
                   echo "  homepage \"https://github.com/julien-blanchon/silo\"" >> "$CASK_PATH"
                   echo "" >> "$CASK_PATH"
@@ -209,6 +209,6 @@ jobs:
                   cd tap-repo
                   git config user.name "github-actions"
                   git config user.email "github-actions@github.com"
-                  git add Casks/Silo.rb
-                  git commit -m "Update Silo cask to v$VERSION"
+                  git add Casks/SiloCU.rb
+                  git commit -m "Update SiloCU cask to v$VERSION"
                   git push origin main
