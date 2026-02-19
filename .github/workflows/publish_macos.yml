@@ -189,25 +189,27 @@ jobs:
             - name: Update Cask
               run: |
                   VERSION="${{ needs.build-tauri.outputs.app_version }}"
-                  DOWNLOAD_URL="https://github.com/julien-blanchon/silo/releases/download/v${VERSION}/${{ steps.shasum.outputs.file_name }}"
+                  FILE_NAME="${{ steps.shasum.outputs.file_name }}"
+                  SHA="${{ steps.shasum.outputs.sha256 }}"
                   CASK_PATH="tap-repo/Casks/silocu.rb"
 
                   echo "Generating cask for version $VERSION..."
-                  echo "Download URL: $DOWNLOAD_URL"
 
-                  echo "cask \"silocu\" do" > "$CASK_PATH"
-                  echo "  version \"$VERSION\"" >> "$CASK_PATH"
-                  echo "  sha256 \"${{ steps.shasum.outputs.sha256 }}\"" >> "$CASK_PATH"
-                  echo "" >> "$CASK_PATH"
-                  echo "  url \"$DOWNLOAD_URL\"," >> "$CASK_PATH"
-                  echo "      verified: \"github.com/julien-blanchon/silo/\"" >> "$CASK_PATH"
-                  echo "" >> "$CASK_PATH"
-                  echo "  name \"silocu\"" >> "$CASK_PATH"
-                  echo "  desc \"AI-powered desktop app built with Tauri\"" >> "$CASK_PATH"
-                  echo "  homepage \"https://github.com/julien-blanchon/silo\"" >> "$CASK_PATH"
-                  echo "" >> "$CASK_PATH"
-                  echo "  app \"Silo.app\"" >> "$CASK_PATH"
-                  echo "end" >> "$CASK_PATH"
+                  cat > "$CASK_PATH" <<EOF
+                  cask "silocu" do
+                    version "$VERSION"
+                    sha256 "$SHA"
+
+                    url "https://github.com/julien-blanchon/silo/releases/download/v#{version}/$FILE_NAME",
+                        verified: "github.com/julien-blanchon/silo/"
+
+                    name "silocu"
+                    desc "AI-powered desktop app built with Tauri"
+                    homepage "https://github.com/julien-blanchon/silo"
+
+                    app "Silo.app"
+                  end
+                  EOF
 
                   cd tap-repo
                   git config user.name "github-actions"
