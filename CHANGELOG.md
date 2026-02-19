@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/julien-blanchon/silo/compare/v1.4.0...v1.4.1) (2026-02-19)
+
+
+### Bug Fixes
+
+* use heredoc for cask generation to prevent dirty tap state ([bb72163](https://github.com/julien-blanchon/silo/commit/bb72163ce4ac797ee99813d256fa9abf26eafc99))
+
 # [1.4.0](https://github.com/julien-blanchon/silo/compare/v1.3.1...v1.4.0) (2026-02-19)
 
 
