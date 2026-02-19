@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/julien-blanchon/silo/compare/v1.3.1...v1.4.0) (2026-02-19)
+
+
+### Features
+
+* **dx:** add CLAUDE.md and Claude Code skills for Svelte 5 and Tauri v2 ([ce12ee8](https://github.com/julien-blanchon/silo/commit/ce12ee805202daf015808acadab939fc959bdfce))
+
 ## [1.3.1](https://github.com/julien-blanchon/silo/compare/v1.3.0...v1.3.1) (2025-10-22)
 
 
